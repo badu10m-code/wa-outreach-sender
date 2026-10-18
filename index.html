@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WA Outreach Sender</title>
+<style>
+  :root { --bg:#0f1115; --card:#171a21; --line:#262b36; --text:#e8eaf0; --muted:#8b93a5; --accent:#25d366; --accent2:#128c7e; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,-apple-system,sans-serif; padding:24px; max-width:860px; margin:0 auto; }
+  h1 { font-size:22px; font-weight:600; margin-bottom:4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; letter-spacing:.3px; }
+  textarea { width:100%; background:#0c0e12; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:14px; font-family:inherit; resize:vertical; }
+  textarea { min-height:110px; }
+  textarea:focus { outline:none; border-color:var(--accent2); }
+  .hint { font-size:11.5px; color:var(--muted); margin-top:6px; }
+  .row-btns { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  button { cursor:pointer; border:none; border-radius:8px; font-size:13.5px; font-weight:600; padding:9px 16px; font-family:inherit; }
+  .btn-build { background:var(--accent); color:#06210f; }
+  .btn-ghost { background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .btn-ghost:hover { color:var(--text); border-color:#3a4150; }
+  .stats { display:flex; gap:18px; font-size:13px; color:var(--muted); margin:2px 0 10px; align-items:center; }
+  .stats b { color:var(--text); }
+  #list { display:flex; flex-direction:column; gap:8px; }
+  .item { display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .item.done { opacity:.45; }
+  .item.done .nm { text-decoration:line-through; }
+  .item .idx { color:var(--muted); font-size:12px; width:26px; text-align:right; flex-shrink:0; }
+  .item .info { flex:1; min-width:0; }
+  .item .nm { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .item .num { font-size:12px; color:var(--muted); }
+  .item .msg-prev { font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .send { background:var(--accent); color:#06210f; text-decoration:none; display:inline-block; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:600; flex-shrink:0; }
+  .donebtn { background:transparent; color:var(--muted); border:1px solid var(--line); padding:8px 10px; flex-shrink:0; font-size:13px; }
+  .empty { color:var(--muted); font-size:13.5px; text-align:center; padding:24px; }
+  .tpl-note code { color:#7ee2a8; background:#0c0e12; padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>WA Outreach Sender</h1>
+<div class="sub">Bulk list daalo, template set karo, ek-ek karke Send dabao. {name} business naam se replace hota hai.</div>
+
+<div class="card">
+  <label>TEMPLATE MESSAGE</label>
+  <textarea id="tpl">Hi {name}! 👋
+
+Main local businesses ke liye modern, fast websites banata hoon jo Google par customers laati hain.
+
+Aapki website abhi nahi dikh rahi, interested ho to main ek FREE demo design bhej sakta hoon. Reply karein.</textarea>
+  <div class="hint tpl-note">Placeholder: <code>{name}</code> = business name. Line breaks message me waise hi jayenge.</div>
+  <div class="row-btns">
+    <button class="btn-build" onclick="build()">Build List</button>
+  </div>
+</div>
+
+<div class="card">
+  <label>BUSINESS LIST <span style="font-weight:400">(ek line per business)</span></label>
+  <textarea id="bulk" placeholder="Sharma Dental Clinic, 9876543210
+Fit Zone Gym, +91 98123 45678
+Gupta Salon - 9811122233"></textarea>
+  <div class="hint">Comma, hyphen ya tab se naam aur number alag karo. 10-digit number par +91 khud lag jayega.</div>
+</div>
+
+<div class="stats" id="stats" style="display:none">
+  <span>Total: <b id="cTotal">0</b></span>
+  <span>Sent: <b id="cDone">0</b></span>
+  <span>Bache: <b id="cLeft">0</b></span>
+  <span><button class="btn-ghost" style="padding:4px 10px;font-size:12px" onclick="resetAll()">Reset</button></span>
+</div>
+
+<div id="list"><div class="empty">List banane ke liye pehle Build List dabao.</div></div>
+
+<script>
+let items = [];
+function tplEl(){ return document.getElementById('tpl'); }
+function load(){ try{ items = JSON.parse(localStorage.getItem('wa_items')||'[]'); tplEl().value = localStorage.getItem('wa_tpl')||tplEl().value; }catch(e){} if(items.length) render(); }
+function save(){ localStorage.setItem('wa_items', JSON.stringify(items)); localStorage.setItem('wa_tpl', tplEl().value); }
+function cleanNum(raw){
+  let n = (raw||'').replace(/[^\d]/g,'');
+  if(n.length===10) n = '91'+n;
+  if(n.length===11 && n.startsWith('0')) n = '91'+n.slice(1);
+  if(n.length===12 && n.startsWith('91')) return n;
+  return n.length>=12 ? n : null;
+}
+function esc(s){ return encodeURIComponent(s); }
+function msgFor(it, tpl){ return tpl.split('{name}').join(it.name); }
+function h(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function build(){
+  const raw = document.getElementById('bulk').value.trim();
+  if(!raw){ alert('Pehle list daalo'); return; }
+  items = [];
+  raw.split('\n').forEach((line,i)=>{
+    if(!line.trim()) return;
+    let name='', num='';
+    const t = line.split(/\t/); const c = line.split(',');
+    const parts = (t.length>=2)? t : (c.length>=2? c : line.split(/\s+-\s+/));
+    if(parts.length>=2){ name = parts[0].trim(); num = parts.slice(1).join(' ').trim(); }
+    else { const m = line.match(/[\+\d][\d\s\-\(\)]{7,}/); if(m){ num = m[0]; name = line.replace(m[0],'').replace(/[,\-–—]+$/,'').trim(); } else { name = line.trim(); } }
+    items.push({ name: name||('Business '+(i+1)), num: cleanNum(num), raw: num.trim(), done:false });
+  });
+  if(!items.length){ alert('Koi valid entry nahi mili'); return; }
+  render(); save();
+}
+function render(){
+  const list = document.getElementById('list');
+  const bad = items.filter(x=>!x.num).length;
+  document.getElementById('stats').style.display='flex';
+  document.getElementById('cTotal').textContent = items.length;
+  document.getElementById('cDone').textContent = items.filter(x=>x.done).length;
+  document.getElementById('cLeft').textContent = (items.filter(x=>!x.done).length) + (bad? ' ('+bad+' invalid number)':'');
+  list.innerHTML = '';
+  const tpl = tplEl().value;
+  items.forEach((it,i)=>{
+    const d = document.createElement('div');
+    d.className = 'item'+(it.done?' done':'');
+    const prev = msgFor(it,tpl).replace(/\s+/g,' ').slice(0,70);
+    if(it.num){
+      d.innerHTML = `<span class="idx">${i+1}</span>
+        <div class="info"><div class="nm">${h(it.name)}</div><div class="num">+${h(it.num)}</div><div class="msg-prev">${h(prev)}</div></div>
+        <a class="send" href="https://wa.me/${h(it.num)}?text=${esc(msgFor(it,tpl))}" target="_blank" rel="noopener" onclick="mark(${i})">Send</a>
+        <button class="donebtn" onclick="toggle(${i})" title="Done mark">${it.done?'↺':'✓'}</button>`;
+    } else {
+      d.innerHTML = `<span class="idx">${i+1}</span>
+        <div class="info"><div class="nm">${h(it.name)}</div><div class="num" style="color:#e06c75">number nahi samajh aaya: "${h(it.raw)}"</div></div>
+        <button class="donebtn" onclick="toggle(${i})">${it.done?'↺':'✓'}</button>`;
+    }
+    list.appendChild(d);
+  });
+  save();
+}
+function mark(i){ items[i].done = true; setTimeout(render, 300); }
+function toggle(i){ items[i].done = !items[i].done; render(); }
+function resetAll(){ if(confirm('List reset? Done marks bhi hat jayenge.')){ items=[]; localStorage.removeItem('wa_items'); document.getElementById('stats').style.display='none'; document.getElementById('list').innerHTML='<div class="empty">List banane ke liye pehle Build List dabao.</div>'; } }
+load();
+</script>
+</body>
+</html>
